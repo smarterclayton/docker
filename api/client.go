@@ -1906,6 +1906,11 @@ func (cli *DockerCli) CmdRun(args ...string) error {
 		}
 	}
 
+	if hostConfig.CreateOnly {
+		fmt.Fprintf(cli.out, "%s\n", runResult.Get("Id"))
+		return nil
+	}
+
 	if sigProxy {
 		sigc := cli.forwardAllSignals(runResult.Get("Id"))
 		defer signal.StopCatch(sigc)
