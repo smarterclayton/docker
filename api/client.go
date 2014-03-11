@@ -37,6 +37,20 @@ import (
 	"time"
 )
 
+type CallResponse struct {
+	Response   *http.Response
+	ClientConn *httputil.ClientConn
+}
+
+func (r *CallResponse) Close() error {
+	r.Response.Body.Close()
+	return r.ClientConn.Close()
+}
+
+func (r *CallResponse) Read(p []byte) (n int, err error) {
+	return r.Response.Body.Read(p)
+}
+
 var funcMap = template.FuncMap{
 	"json": func(v interface{}) string {
 		a, _ := json.Marshal(v)
@@ -2040,7 +2054,7 @@ func (cli *DockerCli) CmdLoad(args ...string) error {
 	return nil
 }
 
-func (cli *DockerCli) call(method, path string, data interface{}, passAuthInfo bool) (io.ReadCloser, int, error) {
+func (cli *DockerCli) call(method, path string, data interface{}, passAuthInfo bool) (*CallResponse, int, error) {
 	params := bytes.NewBuffer(nil)
 	if data != nil {
 		if env, ok := data.(engine.Env); ok {
@@ -2120,13 +2134,7 @@ func (cli *DockerCli) call(method, path string, data interface{}, passAuthInfo b
 		return nil, resp.StatusCode, fmt.Errorf("Error: %s", bytes.TrimSpace(body))
 	}
 
-	wrapper := utils.NewReadCloserWrapper(resp.Body, func() error {
-		if resp != nil && resp.Body != nil {
-			resp.Body.Close()
-		}
-		return clientconn.Close()
-	})
-	return wrapper, resp.StatusCode, nil
+	return &CallResponse{resp, clientconn}, resp.StatusCode, nil
 }
 
 func (cli *DockerCli) stream(method, path string, in io.Reader, out io.Writer, headers map[string][]string) error {
