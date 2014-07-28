@@ -1219,6 +1219,10 @@ func (srv *Server) pullRepository(r *registry.Registry, out io.Writer, localName
 	}
 
 	for tag, id := range tagsList {
+		if tag == askedTag && id != askedTag {
+			utils.Debugf("Tag (%s) exists but points to a different image ID (%s), ignoring tag", askedTag, id)
+			id = askedTag
+		}
 		repoData.ImgList[id] = &registry.ImgData{
 			ID:       id,
 			Tag:      tag,
@@ -1233,10 +1237,18 @@ func (srv *Server) pullRepository(r *registry.Registry, out io.Writer, localName
 			repoData.ImgList[id].Tag = tag
 		}
 	} else {
-		// Otherwise, check that the tag exists and use only that one
-		id, exists := tagsList[askedTag]
-		if !exists {
-			return fmt.Errorf("Tag %s not found in repository %s", askedTag, localName)
+		// Otherwise, check that an image with that ID or tag exists and use only that one
+		var id string
+		if _, exists := repoData.ImgList[askedTag]; exists {
+			utils.Debugf("Using image (%s) by ID", askedTag)
+			id = askedTag
+			tagsList[askedTag] = id
+		} else {
+			taggedId, exists := tagsList[askedTag]
+			if !exists {
+				return fmt.Errorf("Tag %s not found in repository %s", askedTag, localName)
+			}
+			id = taggedId
 		}
 		repoData.ImgList[id].Tag = askedTag
 	}
